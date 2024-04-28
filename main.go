@@ -13,8 +13,7 @@ func main() {
 	}
 	tokens, err := lexer.Lex()
 	if err != nil {
-		fmt.Println(err)
-		return
+		panic(err)
 	}
 	for _, token := range tokens {
 		fmt.Printf("%+v \n", token)
@@ -25,7 +24,7 @@ func main() {
 	p.SetVar("FOUR", 4)
 	ast, err := p.Parse()
 	if err != nil {
-		fmt.Println(err)
+		panic(err)
 	} else {
 		fmt.Printf("%.15f \n", ast.Evaluate())
 	}

@@ -12,69 +12,85 @@ import (
 
 type Parser struct {
 	Tokens   []*lexer.Token
-	CurToken *lexer.Token
-	Index    int
-	Err      error
-	Params   map[string]float64
+	curToken *lexer.Token
+	index    int
+	err      error
+	params   map[string]float64
 }
 
-type Node interface {
+type node interface {
 	Evaluate() float64
 }
 
-type Number struct {
+type number struct {
 	Val float64
 }
 
-type Stmt struct {
+type stmt struct {
 	Type  int
-	Left  Node
-	Right Node
+	Left  node
+	Right node
 }
 
-type Func struct {
-	Name string
-	Args []Node
-}
-
-type Var struct {
+type variable struct {
 	Key string
 	Val float64
 }
 
+type function struct {
+	Name string
+	Args []node
+}
+
+// 函数
+var Functions map[string]func(...node) float64
+
 func init() {
-	RegFunc()
+	Functions = map[string]func(...node) float64{
+		"min": func(n ...node) float64 {
+			return math.Min(n[0].Evaluate(), n[1].Evaluate())
+		},
+		"max": func(n ...node) float64 {
+			return math.Max(n[0].Evaluate(), n[1].Evaluate())
+		},
+		"floor": func(n ...node) float64 {
+			return math.Floor(n[0].Evaluate())
+		},
+		"round": func(n ...node) float64 {
+			return math.Round(n[0].Evaluate())
+		},
+	}
 }
 
 // 解析token
-func (r *Parser) Parse() (Node, error) {
+func (r *Parser) Parse() (node, error) {
 	if len(r.Tokens) == 0 {
 		return nil, errors.New("the token list is empty")
 	}
-	if r.CurToken == nil {
-		r.CurToken = r.Tokens[0]
+	if r.curToken == nil {
+		r.curToken = r.Tokens[0]
 	}
-	return r.Compile(), r.Err
+	return r.Compile(), r.err
 }
 
 // 设置变量
 func (r *Parser) SetVar(key string, value float64) {
-	if r.Params == nil {
-		r.Params = make(map[string]float64, 0)
+	if r.params == nil {
+		r.params = make(map[string]float64, 0)
 	}
-	r.Params[key] = value
+	r.params[key] = value
 }
 
 // 构建树
-func (r *Parser) Compile() Node {
+func (r *Parser) Compile() node {
 	left := r.ParseExpr()
 	right := r.ParseRight(1, left)
 	return right
 }
 
 // 从左开始处理
-func (r *Parser) ParseExpr() Node {
-	switch r.CurToken.Type {
+func (r *Parser) ParseExpr() node {
+	switch r.curToken.GetType() {
 	case enums.LPAREN:
 		return r.ParseStmt()
 	case enums.LBRACE:
@@ -84,13 +100,13 @@ func (r *Parser) ParseExpr() Node {
 	case enums.ADD:
 		return r.ParseNumber()
 	case enums.SUB:
-		if t := r.NextToken(); t.Type == enums.EOF {
-			r.Err = errors.New("expects to be number, eof given")
+		if t := r.NextToken(); t.GetType() == enums.EOF {
+			r.err = errors.New("expects to be number, eof given")
 			return nil
 		}
-		return &Stmt{
+		return &stmt{
 			Type:  enums.SUB,
-			Left:  &Number{},
+			Left:  &number{},
 			Right: r.ParseExpr(),
 		}
 	case enums.MUL:
@@ -104,19 +120,19 @@ func (r *Parser) ParseExpr() Node {
 	case enums.FUNC:
 		return r.ParseFunc()
 	default:
-		r.Err = fmt.Errorf("expects to be number, '%s' given", r.CurToken.Str)
+		r.err = fmt.Errorf("expects to be number, '%s' given", r.curToken.GetStr())
 		return nil
 	}
 }
 
 // 处理操作符右侧
-func (r *Parser) ParseRight(precedence int, left Node) Node {
+func (r *Parser) ParseRight(precedence int, left node) node {
 	for {
 		curPrec := r.Precedence()
 		if curPrec < precedence {
 			return left
 		}
-		tokenType := r.CurToken.Type
+		tokenType := r.curToken.GetType()
 		r.NextToken()
 		right := r.ParseExpr()
 		if right == nil {
@@ -128,7 +144,7 @@ func (r *Parser) ParseRight(precedence int, left Node) Node {
 				return nil
 			}
 		}
-		left = &Stmt{
+		left = &stmt{
 			Type:  tokenType,
 			Left:  left,
 			Right: right,
@@ -137,22 +153,22 @@ func (r *Parser) ParseRight(precedence int, left Node) Node {
 }
 
 // 变量
-func (r *Parser) ParseVar() *Var {
-	if t := r.NextToken(); t.Type == enums.EOF {
-		r.Err = errors.New("expects to be variable, eof given")
+func (r *Parser) ParseVar() *variable {
+	if t := r.NextToken(); t.GetType() == enums.EOF {
+		r.err = errors.New("expects to be variable, eof given")
 		return nil
 	}
-	key := r.CurToken.Str
-	if t := r.NextToken(); t.Type == enums.EOF {
-		r.Err = errors.New("expects to be '}', eof given")
+	key := r.curToken.GetStr()
+	if t := r.NextToken(); t.GetType() == enums.EOF {
+		r.err = errors.New("expects to be '}', eof given")
 		return nil
 	}
-	v, ok := r.Params[key]
+	v, ok := r.params[key]
 	if !ok {
-		r.Err = fmt.Errorf("variable %s is not bound", key)
+		r.err = fmt.Errorf("variable %s is not bound", key)
 		v = 0
 	}
-	node := &Var{
+	node := &variable{
 		Key: key,
 		Val: v,
 	}
@@ -161,12 +177,12 @@ func (r *Parser) ParseVar() *Var {
 }
 
 // 数字
-func (r *Parser) ParseNumber() *Number {
-	f, err := strconv.ParseFloat(r.CurToken.Str, 64)
+func (r *Parser) ParseNumber() *number {
+	f, err := strconv.ParseFloat(r.curToken.GetStr(), 64)
 	if err != nil {
-		return &Number{}
+		return &number{}
 	}
-	node := &Number{
+	node := &number{
 		Val: f,
 	}
 	r.NextToken()
@@ -174,18 +190,18 @@ func (r *Parser) ParseNumber() *Number {
 }
 
 // 表达式
-func (r *Parser) ParseStmt() Node {
-	if t := r.NextToken(); t.Type == enums.EOF {
-		r.Err = errors.New("expects to be number, eof given")
+func (r *Parser) ParseStmt() node {
+	if t := r.NextToken(); t.GetType() == enums.EOF {
+		r.err = errors.New("expects to be number, eof given")
 		return nil
 	}
 	node := r.Compile()
 	if node == nil {
-		r.Err = errors.New("expects to be number, nil given")
+		r.err = errors.New("expects to be number, nil given")
 		return nil
 	}
-	if r.CurToken.Type != enums.RPAREN {
-		r.Err = fmt.Errorf("expects to be number, '%s' given", r.CurToken.Str)
+	if r.curToken.GetType() != enums.RPAREN {
+		r.err = fmt.Errorf("expects to be number, '%s' given", r.curToken.GetStr())
 		return nil
 	}
 	r.NextToken()
@@ -193,56 +209,50 @@ func (r *Parser) ParseStmt() Node {
 }
 
 // 函数
-func (r *Parser) ParseFunc() Node {
-	funcName := r.CurToken.Str
-	if t := r.NextToken(); t.Type != enums.LPAREN {
-		r.Err = fmt.Errorf("expects to be '(', '%s' given", r.CurToken.Str)
+func (r *Parser) ParseFunc() node {
+	funcName := r.curToken.GetStr()
+	if t := r.NextToken(); t.GetType() != enums.LPAREN {
+		r.err = fmt.Errorf("expects to be '(', '%s' given", r.curToken.GetStr())
 		return nil
 	}
-	nodes := make([]Node, 0)
-	for r.CurToken.Type != enums.RPAREN {
-		if t := r.NextToken(); t.Type == enums.EOF {
+	nodes := make([]node, 0)
+	for r.curToken.GetType() != enums.RPAREN {
+		if t := r.NextToken(); t.GetType() == enums.EOF {
 			break
 		}
-		if r.CurToken.Type == enums.COMMA {
+		if r.curToken.GetType() == enums.COMMA {
 			continue
 		}
 		nodes = append(nodes, r.Compile())
 	}
-	if r.CurToken.Type != enums.RPAREN {
-		r.Err = fmt.Errorf("expects to be number, '%s' given", r.CurToken.Str)
+	if r.curToken.GetType() != enums.RPAREN {
+		r.err = fmt.Errorf("expects to be number, '%s' given", r.curToken.GetStr())
 		return nil
 	}
-	if _, ok := CallFunc[funcName]; !ok {
-		fmt.Printf("func %s is undefined \n", funcName)
-		return &Func{
-			Name: DEF_FUNC,
-			Args: nodes,
-		}
+	if _, ok := Functions[funcName]; !ok {
+		r.err = fmt.Errorf("func %s is undefined", funcName)
+		return nil
 	}
-	return &Func{
+	return &function{
 		Name: funcName,
 		Args: nodes,
 	}
 }
 
-// 下一个字符
+// 下一个token
 func (r *Parser) NextToken() *lexer.Token {
-	r.Index++
-	if r.Index >= len(r.Tokens) {
-		r.CurToken = &lexer.Token{
-			Str:  "eof",
-			Type: enums.EOF,
-		}
+	r.index++
+	if r.index >= len(r.Tokens) {
+		r.curToken = lexer.EOF()
 	} else {
-		r.CurToken = r.Tokens[r.Index]
+		r.curToken = r.Tokens[r.index]
 	}
-	return r.CurToken
+	return r.curToken
 }
 
 // 优先级
 func (r *Parser) Precedence() int {
-	switch r.CurToken.Type {
+	switch r.curToken.GetType() {
 	case enums.ADD, enums.SUB:
 		return 1
 	case enums.MUL, enums.QUO, enums.REM:
@@ -254,7 +264,7 @@ func (r *Parser) Precedence() int {
 	}
 }
 
-func (r *Stmt) Evaluate() float64 {
+func (r *stmt) Evaluate() float64 {
 	left := r.Left.Evaluate()
 	right := r.Right.Evaluate()
 	switch r.Type {
@@ -283,22 +293,22 @@ func (r *Stmt) Evaluate() float64 {
 	}
 }
 
-func (r *Number) Evaluate() float64 {
+func (r *number) Evaluate() float64 {
 	return r.Val
 }
 
-func (r *Func) Evaluate() float64 {
-	return CallFunc[r.Name](r.Args...)
+func (r *function) Evaluate() float64 {
+	return Functions[r.Name](r.Args...)
 }
 
-func (r *Var) Evaluate() float64 {
+func (r *variable) Evaluate() float64 {
 	return r.Val
 }
 
-func (r *Number) String() string {
+func (r *number) String() string {
 	return fmt.Sprintf("{Type: %d, Val: %f}", enums.NUMBER, r.Val)
 }
 
-func (r *Stmt) String() string {
+func (r *stmt) String() string {
 	return fmt.Sprintf("{Type: %d, Left: %+v, Right: %+v}", r.Type, r.Left, r.Right)
 }
