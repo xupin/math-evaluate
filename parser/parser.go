@@ -11,7 +11,7 @@ import (
 )
 
 type Parser struct {
-	Tokens   []*lexer.Token
+	Tokens   []lexer.Token
 	curToken *lexer.Token
 	index    int
 	err      error
@@ -68,7 +68,7 @@ func (r *Parser) Parse() (node, error) {
 		return nil, errors.New("the token list is empty")
 	}
 	if r.curToken == nil {
-		r.curToken = r.Tokens[0]
+		r.curToken = &r.Tokens[0]
 	}
 	return r.Compile(), r.err
 }
@@ -245,7 +245,7 @@ func (r *Parser) NextToken() *lexer.Token {
 	if r.index >= len(r.Tokens) {
 		r.curToken = lexer.EOF()
 	} else {
-		r.curToken = r.Tokens[r.index]
+		r.curToken = &r.Tokens[r.index]
 	}
 	return r.curToken
 }

@@ -14,8 +14,8 @@ type Lexer struct {
 	pos        int
 }
 
-func (r *Lexer) Lex() ([]*Token, error) {
-	tokens := make([]*Token, 0)
+func (r *Lexer) Lex() ([]Token, error) {
+	tokens := make([]Token, 0)
 	if len(r.Expression) == 0 {
 		return tokens, errors.New("the token list is empty")
 	}
@@ -26,7 +26,7 @@ func (r *Lexer) Lex() ([]*Token, error) {
 	for r.pos < len(r.Expression) {
 		token := r.Scan()
 		if token.t == enums.ILLEGAL {
-			return []*Token{}, fmt.Errorf("'%s' is not supported", token.str)
+			return []Token{}, fmt.Errorf("'%s' is not supported", token.str)
 		}
 		tokens = append(tokens, token)
 	}
@@ -44,12 +44,12 @@ func (r *Lexer) IsChinese() bool {
 }
 
 // 获取下一个token
-func (r *Lexer) Scan() *Token {
-	var token *Token
+func (r *Lexer) Scan() Token {
+	var token Token
 	pos := r.pos
 	switch r.char {
 	case '(':
-		token = &Token{
+		token = Token{
 			str:   string(r.char),
 			t:     enums.LPAREN,
 			start: pos,
@@ -57,7 +57,7 @@ func (r *Lexer) Scan() *Token {
 		}
 		r.NextChar()
 	case ')':
-		token = &Token{
+		token = Token{
 			str:   string(r.char),
 			t:     enums.RPAREN,
 			start: pos,
@@ -65,7 +65,7 @@ func (r *Lexer) Scan() *Token {
 		}
 		r.NextChar()
 	case '{':
-		token = &Token{
+		token = Token{
 			str:   string(r.char),
 			t:     enums.LBRACE,
 			start: pos,
@@ -73,7 +73,7 @@ func (r *Lexer) Scan() *Token {
 		}
 		r.NextChar()
 	case '}':
-		token = &Token{
+		token = Token{
 			str:   string(r.char),
 			t:     enums.RBRACE,
 			start: pos,
@@ -81,7 +81,7 @@ func (r *Lexer) Scan() *Token {
 		}
 		r.NextChar()
 	case ',':
-		token = &Token{
+		token = Token{
 			str:   string(r.char),
 			t:     enums.COMMA,
 			start: pos,
@@ -104,14 +104,14 @@ func (r *Lexer) Scan() *Token {
 				break
 			}
 		}
-		token = &Token{
+		token = Token{
 			str:   string(r.Expression[pos:r.pos]),
 			t:     enums.NUMBER,
 			start: pos,
 			end:   r.pos - 1,
 		}
 	case '+':
-		token = &Token{
+		token = Token{
 			str:   string(r.char),
 			t:     enums.ADD,
 			start: pos,
@@ -119,7 +119,7 @@ func (r *Lexer) Scan() *Token {
 		}
 		r.NextChar()
 	case '-':
-		token = &Token{
+		token = Token{
 			str:   string(r.char),
 			t:     enums.SUB,
 			start: pos,
@@ -127,14 +127,14 @@ func (r *Lexer) Scan() *Token {
 		}
 		r.NextChar()
 	case '*':
-		token = &Token{
+		token = Token{
 			str:   string(r.char),
 			t:     enums.MUL,
 			start: pos,
 			end:   pos,
 		}
 		if r.NextChar() && r.char == '*' {
-			token = &Token{
+			token = Token{
 				str:   "**",
 				t:     enums.XOR,
 				start: pos,
@@ -143,7 +143,7 @@ func (r *Lexer) Scan() *Token {
 			r.NextChar()
 		}
 	case '/':
-		token = &Token{
+		token = Token{
 			str:   string(r.char),
 			t:     enums.QUO,
 			start: pos,
@@ -151,7 +151,7 @@ func (r *Lexer) Scan() *Token {
 		}
 		r.NextChar()
 	case '%':
-		token = &Token{
+		token = Token{
 			str:   string(r.char),
 			t:     enums.REM,
 			start: pos,
@@ -159,7 +159,7 @@ func (r *Lexer) Scan() *Token {
 		}
 		r.NextChar()
 	case '^':
-		token = &Token{
+		token = Token{
 			str:   string(r.char),
 			t:     enums.XOR,
 			start: pos,
@@ -180,7 +180,7 @@ func (r *Lexer) Scan() *Token {
 					break
 				}
 			}
-			token = &Token{
+			token = Token{
 				str:   string(r.Expression[pos:r.pos]),
 				t:     enums.FUNC,
 				start: pos,
@@ -192,14 +192,14 @@ func (r *Lexer) Scan() *Token {
 					break
 				}
 			}
-			token = &Token{
+			token = Token{
 				str:   string(r.Expression[pos:r.pos]),
 				t:     enums.VAR,
 				start: pos,
 				end:   r.pos - 1,
 			}
 		} else {
-			token = &Token{
+			token = Token{
 				str:   string(r.char),
 				t:     enums.ILLEGAL,
 				start: pos,
