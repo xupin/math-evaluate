@@ -16,10 +16,10 @@ func EOF() *Token {
 	}
 }
 
-func (r *Token) GetStr() string {
-	return r.str
+func (t *Token) GetStr() string {
+	return t.str
 }
 
-func (r *Token) GetType() int {
-	return r.t
+func (t *Token) GetType() int {
+	return t.t
 }
