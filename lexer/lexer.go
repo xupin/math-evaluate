@@ -23,10 +23,10 @@ func New(exp string) *lexer {
 func (l *lexer) Lex() ([]Token, error) {
 	tokens := make([]Token, 0)
 	if len(l.expression) == 0 {
-		return tokens, errors.New("the token list is empty")
+		return tokens, errors.New("input expression is empty")
 	}
 	if l.isChinese() {
-		return tokens, errors.New("the token list contains Chinese characters")
+		return tokens, errors.New("input expression contains Chinese characters")
 	}
 	l.char = l.expression[0]
 	for l.pos < len(l.expression) {

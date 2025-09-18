@@ -71,7 +71,7 @@ func (p *parser) parseExpr() node {
 		return p.parseNumber()
 	case enums.SUB:
 		if t := p.nextToken(); t.GetType() == enums.EOF {
-			p.err = errors.New("expects to be number, eof given")
+			p.err = errors.New("unary minus expects number after '-', got EOF")
 			return nil
 		}
 		return &stmt{
@@ -90,7 +90,7 @@ func (p *parser) parseExpr() node {
 	case enums.FUNC:
 		return p.parseFunc()
 	default:
-		p.err = fmt.Errorf("expects to be number, '%s' given", p.curToken.GetStr())
+		p.err = fmt.Errorf("expression expects valid token, got '%s'", p.curToken.GetStr())
 		return nil
 	}
 }
@@ -106,12 +106,12 @@ func (p *parser) parseRight(priority int, left node) node {
 		p.nextToken()
 		right := p.parseExpr()
 		if right == nil {
-			return nil
+			return left
 		}
 		if curPriority < p.priority() {
 			right = p.parseRight(curPriority, right)
 			if right == nil {
-				return nil
+				return left
 			}
 		}
 		left = &stmt{
@@ -125,7 +125,7 @@ func (p *parser) parseRight(priority int, left node) node {
 // 变量
 func (p *parser) parseVar() *variable {
 	if t := p.nextToken(); t.GetType() == enums.EOF {
-		p.err = errors.New("expects to be variable, eof given")
+		p.err = errors.New("variable expects name after '{', got EOF")
 		return nil
 	}
 	key := p.curToken.GetStr()
@@ -162,16 +162,16 @@ func (p *parser) parseNumber() *number {
 // 表达式
 func (p *parser) parseStmt() node {
 	if t := p.nextToken(); t.GetType() == enums.EOF {
-		p.err = errors.New("expects to be number, eof given")
+		p.err = errors.New("parentheses expects expression after '(', got EOF")
 		return nil
 	}
 	node := p.compile()
 	if node == nil {
-		p.err = errors.New("expects to be number, nil given")
+		p.err = errors.New("parentheses contains invalid expression")
 		return nil
 	}
 	if p.curToken.GetType() != enums.RPAREN {
-		p.err = fmt.Errorf("expects to be number, '%s' given", p.curToken.GetStr())
+		p.err = fmt.Errorf("expression expects ')' to close, got '%s'", p.curToken.GetStr())
 		return nil
 	}
 	p.nextToken()
@@ -182,7 +182,7 @@ func (p *parser) parseStmt() node {
 func (p *parser) parseFunc() node {
 	funcName := p.curToken.GetStr()
 	if t := p.nextToken(); t.GetType() != enums.LPAREN {
-		p.err = fmt.Errorf("expects to be '(', '%s' given", p.curToken.GetStr())
+		p.err = fmt.Errorf("function '%s' expects '(' after name, got '%s'", funcName, p.curToken.GetStr())
 		return nil
 	}
 	nodes := make([]node, 0)
@@ -193,16 +193,20 @@ func (p *parser) parseFunc() node {
 		if p.curToken.GetType() == enums.COMMA {
 			continue
 		}
+		if p.curToken.GetType() == enums.RPAREN {
+			break
+		}
 		nodes = append(nodes, p.compile())
 	}
 	if p.curToken.GetType() != enums.RPAREN {
-		p.err = fmt.Errorf("expects to be number, '%s' given", p.curToken.GetStr())
+		p.err = fmt.Errorf("function '%s' expects ')' to close parameters, got '%s'", funcName, p.curToken.GetStr())
 		return nil
 	}
 	if _, ok := Funcs[funcName]; !ok {
-		p.err = fmt.Errorf("func %s is undefined", funcName)
+		p.err = fmt.Errorf("func '%s' is undefined", funcName)
 		return nil
 	}
+	p.nextToken()
 	return &function{
 		Name: funcName,
 		Args: nodes,

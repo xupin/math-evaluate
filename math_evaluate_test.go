@@ -1,4 +1,4 @@
-package mathevaluatetest
+package mathevaluate_test
 
 import (
 	"testing"
@@ -18,7 +18,7 @@ func TestEvaluateExpression(t *testing.T) {
 	// 打印词法分析结果
 	t.Log("Tokens:")
 	for _, token := range tokens {
-		t.Logf("%+v\n", token)
+		t.Logf("%+v", token)
 	}
 
 	p := parser.New(tokens)
@@ -29,7 +29,7 @@ func TestEvaluateExpression(t *testing.T) {
 	}
 
 	result := ast.Evaluate()
-	t.Logf("Evaluation result: %.15f\n", result)
+	t.Logf("Evaluation result: %.15f", result)
 
 	// 简单断言结果是否正确
 	expected := 3 + (3 + 4*4) // (1+2) + (3+4*4) = 3 + 19 = 22

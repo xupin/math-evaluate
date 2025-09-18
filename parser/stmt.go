@@ -2,6 +2,7 @@ package parser
 
 import (
 	"fmt"
+	"log"
 	"math"
 
 	"github.com/xupin/math-evaluate/enums"
@@ -29,13 +30,13 @@ func (s *stmt) Evaluate() float64 {
 		return left * right
 	case enums.QUO:
 		if right == 0 {
-			fmt.Printf("expr[%g/%g]exception, division by zero \n", left, right)
+			log.Printf("expr[%g/%g]exception, division by zero", left, right)
 			return 0
 		}
 		return left / right
 	case enums.REM:
 		if right == 0 {
-			fmt.Printf("expr[%g%%%g]exception, division by zero \n", left, right)
+			log.Printf("expr[%g%%%g]exception, division by zero", left, right)
 			return 0
 		}
 		return float64(int64(left) % int64(right))
