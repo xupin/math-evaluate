@@ -6,12 +6,13 @@ import (
 	"math"
 
 	"github.com/xupin/math-evaluate/enums"
+	"github.com/xupin/math-evaluate/interfaces"
 )
 
 type stmt struct {
 	Type  int
-	Left  node
-	Right node
+	Left  interfaces.INode
+	Right interfaces.INode
 }
 
 func (s *stmt) String() string {

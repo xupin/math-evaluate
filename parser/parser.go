@@ -3,106 +3,129 @@ package parser
 import (
 	"errors"
 	"fmt"
+	"log"
+	"math"
+	"math/rand/v2"
 	"strconv"
 
 	"github.com/xupin/math-evaluate/enums"
+	"github.com/xupin/math-evaluate/interfaces"
 	"github.com/xupin/math-evaluate/lexer"
 )
+
+type funcType func(...interfaces.INode) float64
 
 type parser struct {
 	tokens   []lexer.Token
 	curToken *lexer.Token
 	index    int
 	err      error
-	params   map[string]float64
-}
-
-type node interface {
-	Evaluate() float64
-}
-
-func init() {
-	// 初始化函数
-	InitFuncs()
+	vars     map[string]float64
+	fn       map[string]funcType
 }
 
 func New(tokens []lexer.Token) *parser {
-	return &parser{
+	p := &parser{
 		tokens: tokens,
+		vars:   make(map[string]float64),
+		fn:     make(map[string]funcType),
 	}
+	p.loadFunc()
+	if len(tokens) > 0 {
+		p.curToken = &tokens[0]
+	}
+	return p
 }
 
-// 解析token
-func (p *parser) Parse() (node, error) {
-	if len(p.tokens) == 0 {
-		return nil, errors.New("the token list is empty")
+// 内置函数
+func (p *parser) loadFunc() {
+	p.fn = map[string]funcType{
+		"min": func(n ...interfaces.INode) float64 {
+			if len(n) < 2 {
+				return 0
+			}
+			return math.Min(n[0].Evaluate(), n[1].Evaluate())
+		},
+		"max": func(n ...interfaces.INode) float64 {
+			if len(n) < 2 {
+				return 0
+			}
+			return math.Max(n[0].Evaluate(), n[1].Evaluate())
+		},
+		"floor": func(n ...interfaces.INode) float64 {
+			if len(n) < 1 {
+				return 0
+			}
+			return math.Floor(n[0].Evaluate())
+		},
+		"round": func(n ...interfaces.INode) float64 {
+			if len(n) < 1 {
+				return 0
+			}
+			return math.Round(n[0].Evaluate())
+		},
+		"random": func(n ...interfaces.INode) float64 {
+			v := rand.Float64()
+			log.Printf("random %+v", v)
+			return v
+		},
 	}
-	if p.curToken == nil {
-		p.curToken = &p.tokens[0]
-	}
-	return p.compile(), p.err
 }
 
 // 设置变量
 func (p *parser) SetVar(key string, value float64) {
-	if p.params == nil {
-		p.params = make(map[string]float64, 0)
+	p.vars[key] = value
+}
+
+// 设置函数
+func (p *parser) SetFunc(name string, fn funcType) {
+	p.fn[name] = fn
+}
+
+// 解析入口
+func (p *parser) Parse() (interfaces.INode, error) {
+	if len(p.tokens) == 0 {
+		return nil, errors.New("the token list is empty")
 	}
-	p.params[key] = value
+	return p.compile(), p.err
 }
 
-// 构建树
-func (p *parser) compile() node {
+// 构建表达式树
+func (p *parser) compile() interfaces.INode {
 	left := p.parseExpr()
-	right := p.parseRight(1, left)
-	return right
+	return p.parseRight(1, left)
 }
 
-// 从左开始处理
-func (p *parser) parseExpr() node {
+// 解析表达式左侧
+func (p *parser) parseExpr() interfaces.INode {
 	switch p.curToken.GetType() {
-	case enums.LPAREN:
-		return p.parseStmt()
-	case enums.LBRACE:
-		return p.parseVar()
 	case enums.NUMBER:
 		return p.parseNumber()
-	case enums.ADD:
-		return p.parseNumber()
-	case enums.SUB:
-		if t := p.nextToken(); t.GetType() == enums.EOF {
-			p.err = errors.New("unary minus expects number after '-', got EOF")
-			return nil
-		}
+	case enums.SUB: // e.g. -1
+		p.nextToken()
 		return &stmt{
 			Type:  enums.SUB,
-			Left:  &number{},
+			Left:  &number{Val: 0},
 			Right: p.parseExpr(),
 		}
-	case enums.MUL:
-		return p.parseNumber()
-	case enums.QUO:
-		return p.parseNumber()
-	case enums.REM:
-		return p.parseNumber()
-	case enums.XOR:
-		return p.parseNumber()
-	case enums.FUNC:
-		return p.parseFunc()
+	case enums.LPAREN:
+		return p.parseStmt()
+	case enums.IDENT:
+		return p.parseIdent()
 	default:
-		p.err = fmt.Errorf("expression expects valid token, got '%s'", p.curToken.GetStr())
+		p.err = fmt.Errorf("unexpected token '%s'", p.curToken.GetStr())
 		return nil
 	}
 }
 
-// 处理操作符右侧
-func (p *parser) parseRight(priority int, left node) node {
+// 解析二元运算右侧
+func (p *parser) parseRight(priority int, left interfaces.INode) interfaces.INode {
 	for {
 		curPriority := p.priority()
 		if curPriority < priority {
 			return left
 		}
-		tokenType := p.curToken.GetType()
+		op := p.curToken.GetType()
 		p.nextToken()
 		right := p.parseExpr()
 		if right == nil {
@@ -115,61 +138,21 @@ func (p *parser) parseRight(priority int, left node) node {
 			}
 		}
 		left = &stmt{
-			Type:  tokenType,
+			Type:  op,
 			Left:  left,
 			Right: right,
 		}
 	}
 }
 
-// 变量
-func (p *parser) parseVar() *variable {
-	if t := p.nextToken(); t.GetType() == enums.EOF {
-		p.err = errors.New("variable expects name after '{', got EOF")
-		return nil
-	}
-	key := p.curToken.GetStr()
-	if t := p.nextToken(); t.GetType() == enums.EOF {
-		p.err = errors.New("expects to be '}', eof given")
-		return nil
-	}
-	v, ok := p.params[key]
-	if !ok {
-		p.err = fmt.Errorf("variable %s is not bound", key)
-		v = 0
-	}
-	node := &variable{
-		Key: key,
-		Val: v,
-	}
+// 解析括号表达式
+func (p *parser) parseStmt() interfaces.INode {
 	p.nextToken()
-	return node
-}
-
-// 数字
-func (p *parser) parseNumber() *number {
-	f, err := strconv.ParseFloat(p.curToken.GetStr(), 64)
-	if err != nil {
-		return &number{}
-	}
-	node := &number{
-		Val: f,
-	}
-	p.nextToken()
-	return node
-}
-
-// 表达式
-func (p *parser) parseStmt() node {
-	if t := p.nextToken(); t.GetType() == enums.EOF {
-		p.err = errors.New("parentheses expects expression after '(', got EOF")
+	if p.curToken.GetType() == enums.RPAREN {
+		p.err = errors.New("empty parentheses expression")
 		return nil
 	}
 	node := p.compile()
-	if node == nil {
-		p.err = errors.New("parentheses contains invalid expression")
-		return nil
-	}
 	if p.curToken.GetType() != enums.RPAREN {
 		p.err = fmt.Errorf("expression expects ')' to close, got '%s'", p.curToken.GetStr())
 		return nil
@@ -178,23 +161,47 @@ func (p *parser) parseStmt() node {
 	return node
 }
 
-// 函数
-func (p *parser) parseFunc() node {
+// 解析数字
+func (p *parser) parseNumber() interfaces.INode {
+	f, _ := strconv.ParseFloat(p.curToken.GetStr(), 64)
+	node := &number{Val: f}
+	p.nextToken()
+	return node
+}
+
+// 解析函数、变量
+func (p *parser) parseIdent() interfaces.INode {
+	ident := p.curToken.GetStr()
+	if next := p.peekToken(); next != nil && next.GetType() == enums.LPAREN {
+		return p.parseFunc()
+	}
+	val, ok := p.vars[ident]
+	if !ok {
+		p.err = fmt.Errorf("variable '%s' is not bound", ident)
+		val = 0
+	}
+	node := &variable{
+		Key: ident,
+		Val: val,
+	}
+	p.nextToken()
+	return node
+}
+
+// 解析函数调用
+func (p *parser) parseFunc() interfaces.INode {
 	funcName := p.curToken.GetStr()
-	if t := p.nextToken(); t.GetType() != enums.LPAREN {
+	p.nextToken() // skip LPAREN
+	if p.curToken.GetType() != enums.LPAREN {
 		p.err = fmt.Errorf("function '%s' expects '(' after name, got '%s'", funcName, p.curToken.GetStr())
 		return nil
 	}
-	nodes := make([]node, 0)
-	for p.curToken.GetType() != enums.RPAREN {
-		if t := p.nextToken(); t.GetType() == enums.EOF {
-			break
-		}
+	nodes := []interfaces.INode{}
+	p.nextToken()
+	for p.curToken.GetType() != enums.RPAREN && p.curToken.GetType() != enums.EOF {
 		if p.curToken.GetType() == enums.COMMA {
+			p.nextToken()
 			continue
-		}
-		if p.curToken.GetType() == enums.RPAREN {
-			break
 		}
 		nodes = append(nodes, p.compile())
 	}
@@ -202,18 +209,27 @@ func (p *parser) parseFunc() node {
 		p.err = fmt.Errorf("function '%s' expects ')' to close parameters, got '%s'", funcName, p.curToken.GetStr())
 		return nil
 	}
-	if _, ok := Funcs[funcName]; !ok {
+	fn, ok := p.fn[funcName]
+	if !ok {
 		p.err = fmt.Errorf("func '%s' is undefined", funcName)
 		return nil
 	}
 	p.nextToken()
 	return &function{
-		Name: funcName,
+		Fn:   fn,
 		Args: nodes,
 	}
 }
 
-// 下一个token
+// 查看下一个 token
+func (p *parser) peekToken() *lexer.Token {
+	if p.index+1 >= len(p.tokens) {
+		return lexer.EOF()
+	}
+	return &p.tokens[p.index+1]
+}
+
+// 获取下一个 token
 func (p *parser) nextToken() *lexer.Token {
 	p.index++
 	if p.index >= len(p.tokens) {
@@ -224,7 +240,7 @@ func (p *parser) nextToken() *lexer.Token {
 	return p.curToken
 }
 
-// 优先级
+// 运算符优先级
 func (p *parser) priority() int {
 	switch p.curToken.GetType() {
 	case enums.ADD, enums.SUB:

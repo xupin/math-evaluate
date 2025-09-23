@@ -3,12 +3,13 @@ package mathevaluate_test
 import (
 	"testing"
 
+	"github.com/xupin/math-evaluate/interfaces"
 	"github.com/xupin/math-evaluate/lexer"
 	"github.com/xupin/math-evaluate/parser"
 )
 
 func TestEvaluateExpression(t *testing.T) {
-	input := "(1+2)+(3+{FOUR}*4)"
+	input := "(1+2)+(3+FOUR*4)*random()"
 	l := lexer.New(input)
 	tokens, err := l.Lex()
 	if err != nil {
@@ -23,6 +24,10 @@ func TestEvaluateExpression(t *testing.T) {
 
 	p := parser.New(tokens)
 	p.SetVar("FOUR", 4)
+	p.SetFunc("random", func(node ...interfaces.INode) float64 {
+		return 1
+	})
+
 	ast, err := p.Parse()
 	if err != nil {
 		t.Fatalf("Parser error: %v", err)

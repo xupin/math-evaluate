@@ -70,22 +70,6 @@ func (l *lexer) scan() Token {
 			end:   pos,
 		}
 		l.nextChar()
-	case '{':
-		token = Token{
-			str:   string(l.char),
-			t:     enums.LBRACE,
-			start: pos,
-			end:   l.pos,
-		}
-		l.nextChar()
-	case '}':
-		token = Token{
-			str:   string(l.char),
-			t:     enums.RBRACE,
-			start: pos,
-			end:   l.pos,
-		}
-		l.nextChar()
 	case ',':
 		token = Token{
 			str:   string(l.char),
@@ -173,34 +157,25 @@ func (l *lexer) scan() Token {
 		}
 		l.nextChar()
 	default:
-		if l.isWs() { // 跳过空白字符
+		// 跳过空白字符
+		if l.isWs() {
 			for l.nextChar() {
 				if !l.isWs() {
 					break
 				}
 			}
 			return l.scan()
-		} else if l.isLetter() { // 判断是不是字母（函数）
-			for l.isLetter() {
+		}
+		// 判断是不是函数、变量
+		if l.isIdentStart() {
+			for l.isIdentChar() {
 				if !l.nextChar() {
 					break
 				}
 			}
 			token = Token{
 				str:   string(l.expression[pos:l.pos]),
-				t:     enums.FUNC,
-				start: pos,
-				end:   l.pos - 1,
-			}
-		} else if l.isVar() { // 判断是不是变量
-			for l.isVar() {
-				if !l.nextChar() {
-					break
-				}
-			}
-			token = Token{
-				str:   string(l.expression[pos:l.pos]),
-				t:     enums.VAR,
+				t:     enums.IDENT,
 				start: pos,
 				end:   l.pos - 1,
 			}
@@ -237,12 +212,17 @@ func (l *lexer) isDigit() bool {
 	return unicode.IsNumber(rune(l.char)) || l.char == '.'
 }
 
-// 字母
-func (l *lexer) isLetter() bool {
-	return l.char >= 'a' && l.char <= 'z'
+// 以字符开头
+func (l *lexer) isIdentStart() bool {
+	return (l.char >= 'a' && l.char <= 'z') ||
+		(l.char >= 'A' && l.char <= 'Z') ||
+		l.char == '_'
 }
 
-// 变量
-func (l *lexer) isVar() bool {
-	return l.char >= 'A' && l.char <= 'Z'
+// 字符
+func (l *lexer) isIdentChar() bool {
+	return (l.char >= 'a' && l.char <= 'z') ||
+		(l.char >= 'A' && l.char <= 'Z') ||
+		(l.char >= '0' && l.char <= '9') ||
+		l.char == '_'
 }

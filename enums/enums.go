@@ -2,18 +2,17 @@ package enums
 
 const (
 	ILLEGAL = iota
-	// symbols
 	EOF
-	WS     // whitespace
+
+	// symbols
 	LPAREN // (
 	RPAREN // )
-	LBRACE // {
-	RBRACE // }
 	COMMA  // ,
 	PERIOD // .
 
 	// literals
-	NUMBER // TODO 可以细分归类
+	NUMBER
+	IDENT
 
 	// operators
 	ADD // +
@@ -22,7 +21,4 @@ const (
 	QUO // /
 	REM // %
 	XOR // ^
-
-	FUNC // 函数
-	VAR  // 变量
 )
