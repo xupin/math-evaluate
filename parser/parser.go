@@ -172,7 +172,7 @@ func (p *parser) parseNumber() interfaces.INode {
 // 解析函数、变量
 func (p *parser) parseIdent() interfaces.INode {
 	ident := p.curToken.GetStr()
-	if next := p.peekToken(); next != nil && next.GetType() == enums.LPAREN {
+	if next := p.peekNextToken(); next != nil && next.GetType() == enums.LPAREN {
 		return p.parseFunc()
 	}
 	val, ok := p.vars[ident]
@@ -222,7 +222,7 @@ func (p *parser) parseFunc() interfaces.INode {
 }
 
 // 查看下一个 token
-func (p *parser) peekToken() *lexer.Token {
+func (p *parser) peekNextToken() *lexer.Token {
 	if p.index+1 >= len(p.tokens) {
 		return lexer.EOF()
 	}
