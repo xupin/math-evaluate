@@ -27,8 +27,8 @@ type parser struct {
 func New(tokens []lexer.Token) *parser {
 	p := &parser{
 		tokens: tokens,
-		vars:   make(map[string]float64),
-		fn:     make(map[string]funcType),
+		vars:   make(map[string]float64, 0),
+		fn:     make(map[string]funcType, 0),
 	}
 	p.loadFunc()
 	if len(tokens) > 0 {

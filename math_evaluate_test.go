@@ -9,7 +9,7 @@ import (
 )
 
 func TestEvaluateExpression(t *testing.T) {
-	input := "(1+2)+(3+FOUR*4)*random()"
+	input := "(1+2)+(3+four*4)*random()"
 	l := lexer.New(input)
 	tokens, err := l.Lex()
 	if err != nil {
@@ -23,7 +23,7 @@ func TestEvaluateExpression(t *testing.T) {
 	}
 
 	p := parser.New(tokens)
-	p.SetVar("FOUR", 4)
+	p.SetVar("four", 4)
 	p.SetFunc("random", func(node ...interfaces.INode) float64 {
 		return 1
 	})

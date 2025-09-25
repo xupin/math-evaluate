@@ -11,8 +11,7 @@ type Token struct {
 
 func EOF() *Token {
 	return &Token{
-		str: "eof",
-		t:   enums.EOF,
+		t: enums.EOF,
 	}
 }
 
